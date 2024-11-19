@@ -1,0 +1,213 @@
+---
+title: "bowen-island-SDM"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{bowen-island-SDM}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(sdmcsr)
+library(tidyverse)
+```
+
+```{r}
+# ---- BOWEN BOUNDARY
+# Get filepath for Bowen boundary in from sdmcsr package 
+bowen_boundary_path <- "RawData/bowen_boundary/Bowen_boundary.shp"
+# Read in as SpatVector to be used for cropping the raster
+bowen_boundary <- terra::vect(bowen_boundary_path) 
+
+# ---- CROPPING SDM TO BOWEN BOUNDARY
+# TODO: try using Microsoft365R for accessing SDMs directly from OneDrive (https://github.com/Azure/Microsoft365R) 
+# TODO: Microsoft365R doesn't work for SFU OneDrive, because its locked down 
+# # Path to directory to save crop SDMs
+# SDM_crop_dir_path <- system.file("extdata/SDM_crop/", package = "sdmcsr") 
+# # Path to full SDMs
+# SDM_source_path <- "/media/jay/2TB_Drive/Bird_mask/"
+# # Crop all full SDMs to Bowen boundary
+# SDM_crop_dir(SDM_source_path, bowen_boundary, SDM_crop_dir_path) 
+
+# ---- GET LIST WHERE SDM AND CS AGREE
+# Read in final_bird.csv 
+final_bird_path <- "RawData/final_bird.csv"
+final_bird <- read.csv(final_bird_path)
+
+# Subset based on observations in CS and/or meets threshold in SDM 
+sdm_only_bird <- final_bird[final_bird$medT_cs == "sdm_only",] # n = 81
+cs_only_bird <- final_bird[final_bird$medT_cs == "cs_only", ] # n = 4
+agree_bird <- final_bird[final_bird$medT_cs == "both", ] # n = 170
+write.csv(agree_bird, "ProcessedData/agree_bird.csv")
+
+# ---- SELECT CROPPED SDMS FOR AGREED SPECIES
+# Read in list of all cropped SDMs
+SDM_crop_dir_path <- "RawData/SDM_crop/"
+SDM_crop_file_list <- SDM_crop_dir_path %>% 
+  list.files()
+
+# Select only files with "_NAs_" in filename: these SDMs have rock, ice, and large lakes removed
+SDM_crop_NAs_file_list <- SDM_crop_file_list[grepl("_NAs_", SDM_crop_file_list)]
+
+# Create list of strings in Genus.species format from SDM and CS agreement
+species_list <- 
+  agree_bird$scientific_name %>%
+  gsub(" ", ".", .)
+
+# Match filenames to species that have CS and SDM agreement
+SDM_to_stack_file_df <- data.frame(filename = SDM_crop_NAs_file_list) %>%
+  dplyr::filter(stringr::str_detect(filename, paste(species_list, collapse = "|")))
+# nrow = 170, matches length of species_list 
+
+# Create list of full filepaths for NAs SDM
+SDM_to_stack_file_path <- lapply(SDM_to_stack_file_df$filename, function(x) {paste0(SDM_crop_dir_path, "/", x)}) %>%
+  unlist()
+
+# ---- RASTER STACK SELECTED SDMS
+# TODO: turn this into a function 
+
+# Create empty raster that matches resolution to crop SDMs
+# This raster will be looped through to sum all SDMs
+rast_comb <- terra::rast(SDM_to_stack_file_path[1])
+terra::values(rast_comb) <- NA
+
+# Loop through cropped SDMs and add to rast_comb
+for (i in 1:length(SDM_to_stack_file_path)) {
+  sdm <- terra::rast(SDM_to_stack_file_path[i])
+  rast_comb <- terra::mosaic(sdm, rast_comb, fun="sum")
+}
+# Rename variable names and names of SpatRaster
+names(rast_comb) <- "biodiversity"
+terra::varnames(rast_comb) <- "biodiversity"
+
+terra::plot(rast_comb) # seems like strange outline around northwest side 
+# values are close to zero, but not quite
+# suggests that the NA masks are not exactly the same across all SDMs
+
+# deal with this by overwriting much lower values (<1000) with NA for now
+rast_comb_maskfix <- terra::ifel(rast_comb < 1000, NA, rast_comb)
+
+# normalize from 0 to 1 
+nx <- terra::minmax(rast_comb_maskfix)    
+rel_biodiversity <- (rast_comb_maskfix - nx[1,]) / (nx[2,] - nx[1,])
+```
+
+# PLOTTING FOR BIRDS
+```{r}
+basemap_for_plot <- basemaps::basemap_terra(ext = rel_biodiversity, map_service = "carto", map_type = "voyager")
+ebird_obs_df <- "RawData/bowen_island_ebird.csv" %>% read.csv()
+ebird_obs_pts <- terra::vect(ebird_obs_df, 
+                             geom=c("decimalLongitude", "decimalLatitude"), 
+                             crs=terra::crs("epsg:4326"))
+bowen_trails <- "RawData/Trails/Trails.shp" %>% sf::st_read()
+bowen_roads <- "RawData/Roads/Bowen_Road_Inventory.shp" %>% sf::st_read()
+
+
+output_plot <- ggplot2::ggplot() +
+  ggplot2::theme_bw() +
+  tidyterra::geom_spatraster_rgb(data = basemap_for_plot) +
+  tidyterra::geom_spatraster(data = rel_biodiversity) +
+  ggplot2::scale_fill_continuous(
+    na.value = NA,
+    type = "viridis",
+    limits = c(0,1),
+    breaks = c(0, 0.5, 1),
+    guide = ggplot2::guide_colourbar(nbin = 100, 
+                                     draw.ulim = FALSE, 
+                                     draw.llim = FALSE,
+                                     title.position = "top"
+                                     # title.hjust = 0.5
+                                     ),
+    name = "Relative Biodiversity"
+  ) +
+  ggplot2::geom_sf(data = bowen_trails,
+                   aes(color = "Trails")
+                   ) +
+  ggplot2::geom_sf(data = bowen_roads,
+                   aes(color = "Roads")
+                   ) +
+  ggplot2::geom_sf(data = ebird_obs_pts, 
+                   size = 0.5,
+                   aes(color = "eBird Observations")
+                   ) +
+  scale_color_manual(
+    values = c("#5c5c5c", "darkgrey", "lightgrey"),
+    guide = ggplot2::guide_legend(title = NULL,
+                                  theme = ggplot2::theme(
+                                    legend.text = element_text(size = 10, margin = margin(r = 5, l = 5, b = 5)),
+                                    legend.text.position = "top"
+                                  ))
+  ) +
+  ggplot2::scale_x_continuous(expand = c(0,0)) +
+  ggplot2::scale_y_continuous(expand = c(0,0)) +
+  ggplot2::labs(
+    title = "Bird Biodiversity Hotspots on Bowen Island",
+    subtitle = "Relative biodiversity of Bird species derived from Species Distribution Models (SDMs) confirmed by citizen science observations submitted to eBird. Values towards 1.0 indicate higher relative biodiversity, while values towards 0.0 indicate lower relative biodiversity.",
+    caption = "Visualization created by Jay H. Matsushiba (jmatsush@sfu.ca) for the Palen Lab (November 2024)"
+    ) +
+  ggplot2::theme(
+    plot.title = ggplot2::element_text(
+      size = 25, 
+      margin = ggplot2::margin(0, 0, 10, 0)
+    ),
+    plot.subtitle = ggtext::element_textbox_simple(
+      lineheight = 1.5,
+      margin= ggplot2::margin(0, 0, 10, 0)
+    ),
+    axis.text.y = ggplot2::element_text(
+      angle = 90, vjust = 1, hjust = 0.5
+    ),
+    legend.position = "bottom",
+    legend.title = ggplot2::element_text(size = 10),
+    legend.key.height = ggplot2::unit(0.5, "cm"),
+    legend.key.width = ggplot2::unit(1.5, "cm"),
+    legend.direction = "horizontal", 
+    legend.box = "horizontal",
+    plot.margin = unit(c(1.3,0.3,0.8,0), "cm")
+  ) +
+    ggspatial::annotation_scale(
+    location = "br",
+    bar_cols = c("grey60", "white")
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "br", which_north = "true",
+    pad_x = unit(0.2, "in"), pad_y = unit(0.4, "in"),
+    style = ggspatial::north_arrow_nautical(
+      fill = c("grey40", "white"),
+      line_col = "grey20"
+    )
+  )
+
+# Save as PNG
+ggplot2::ggsave(
+  "Figures/output.png", 
+  output_plot, 
+  device = ragg::agg_png, 
+  width = 9, height = 12, units = "in", res = 300
+)
+
+# Save as PNG for poster size
+ggplot2::ggsave(
+  "Figures/output_fullres.png", 
+  output_plot, 
+  device = ragg::agg_png, 
+  width = 36, height = 48, units = "in", dpi = 300,
+  scaling = 4
+)
+
+# Save as PDF
+ggplot2::ggsave(
+  "Figures/output.pdf", 
+  output_plot, 
+  device = "pdf", 
+  width = 9, height = 12, units = "in"
+)
+```
+
