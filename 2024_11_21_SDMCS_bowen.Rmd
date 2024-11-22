@@ -1,0 +1,65 @@
+---
+title: "2024_11_21_SDMCS_bowen"
+author: "Jay Matsushiba"
+date: "2024-11-21"
+output: html_document
+---
+
+```{r setup}
+devtools::install_github("Palen-Lab/sdmcsr", upgrade = "never")
+library(sdmcsr)
+library(tidyverse)
+library(terra)
+library(sf)
+```
+
+```{r rescale_sdm}
+SDMs_og_path <- list.files("/media/jay/2TB_Drive/2024_10_21_SDMs_bowen_biodiversity/", 
+                           pattern = "*.tif$",
+                           recursive = TRUE,
+                           full.names = TRUE) 
+
+for(i in 1:length(SDMs_og_path)) {
+  SDM_rast <- terra::rast(SDMs_og_path[i])
+  SDM_rast_minmax <- terra::minmax(SDM_rast)
+  if(SDM_rast_minmax[2] > 1) {
+    SDM_rast <- SDM_rast / 1000
+  }
+  filename <- paste0("/media/jay/2TB_Drive/2024_10_21_SDMs_bowen_biodiversity/Rescaled/", basename(SDMs_og_path[i]))
+  terra::writeRaster(SDM_rast, filename)
+}
+```
+
+```{r}
+# Bowen Island Boundary
+area <- sf::st_read("RawData/bowen_boundary/Bowen_boundary.shp")
+
+# Available SDMs
+SDM_dir <- "/media/jay/2TB_Drive/2024_10_21_SDMs_bowen_biodiversity/Rescaled/"
+SDM_filepaths <- list.files(SDM_dir) 
+SDM_filepaths <- SDM_filepaths[grepl("_NAs_", SDM_filepaths)]
+
+# Create species list from available SDMs
+species_list <- SDM_filepaths %>%
+  stringr::str_extract("^\\S+\\.[a-zA-Z]+_") %>%
+  stringr::str_remove("_") %>%
+  stringr::str_replace("\\.", " ")
+
+bowen_SDM_iNat <- SDM_iNat_congruence(SDM_dir = SDM_dir, 
+                                      species_list = species_list[1:100],
+                                      area = area,
+                                      mask_NA = T)
+
+bowen_SDM_iNat_amph <- SDM_iNat_congruence(SDM_dir = SDM_dir, 
+                                      species_list = c("Ambystoma gracile",
+                                                       "Ambystoma macrodactylum",
+                                                       "Ensatina eschscholtzii",
+                                                       "Pseudacris regilla",
+                                                       "Rana aurora",
+                                                       "Taricha granulosa"
+                                      ),
+                                      area = area,
+                                      mask_NA = T)
+
+```
+

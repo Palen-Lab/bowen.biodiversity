@@ -1,10 +1,8 @@
 ---
-title: "bowen-island-SDM"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{bowen-island-SDM}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+title: "2024_11_15_SDMCS_bowen_bird"
+author: "Jay Matsushiba"
+date: "2024-11-15"
+output: html_document
 ---
 
 ```{r, include = FALSE}
