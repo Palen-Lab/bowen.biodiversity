@@ -52,7 +52,7 @@ SDM_crop_file_list <- SDM_crop_dir_path %>%
   list.files()
 
 # Select only files with "_NAs_" in filename: these SDMs have rock, ice, and large lakes removed
-SDM_crop_NAs_file_list <- SDM_crop_file_list[grepl("_NAs_", SDM_crop_file_list)]
+SDM_crop_NAs_file_list <- SDM_crop_file_list[!grepl("_NAs_", SDM_crop_file_list)]
 
 # Create list of strings in Genus.species format from SDM and CS agreement
 species_list <- 
@@ -106,12 +106,13 @@ ebird_obs_pts <- terra::vect(ebird_obs_df,
                              crs=terra::crs("epsg:4326"))
 bowen_trails <- "RawData/Trails/Trails.shp" %>% sf::st_read()
 bowen_roads <- "RawData/Roads/Bowen_Road_Inventory.shp" %>% sf::st_read()
-
+bowen_shoreline <- "RawData/shoreline_dem_smoothed2/shoreline_dem_smoothed2.shp" %>% sf::st_read()
 
 output_plot <- ggplot2::ggplot() +
   ggplot2::theme_bw() +
-  tidyterra::geom_spatraster_rgb(data = basemap_for_plot) +
+  # tidyterra::geom_spatraster_rgb(data = basemap_for_plot) +
   tidyterra::geom_spatraster(data = rel_biodiversity) +
+  geom_sf(data = bowen_shoreline, fill = NA) +
   ggplot2::scale_fill_continuous(
     na.value = NA,
     type = "viridis",
@@ -185,7 +186,7 @@ output_plot <- ggplot2::ggplot() +
 
 # Save as PNG
 ggplot2::ggsave(
-  "Figures/output.png", 
+  "Figures/2024_11_27_output.png", 
   output_plot, 
   device = ragg::agg_png, 
   width = 9, height = 12, units = "in", res = 300

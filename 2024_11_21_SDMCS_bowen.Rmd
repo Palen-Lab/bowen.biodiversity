@@ -7,14 +7,87 @@ output: html_document
 
 ```{r setup}
 devtools::install_github("Palen-Lab/sdmcsr", upgrade = "never")
+devtools::install_github("Palen-Lab/rinat")
+
 library(sdmcsr)
+library(rinat)
+
 library(tidyverse)
 library(terra)
 library(sf)
 ```
 
+```{r}
+if(!dir.exists("/media/jay/2TB_Drive/2024_11_27_SDM/Fish_mask")) {
+  dir.create("/media/jay/2TB_Drive/2024_11_27_SDM")
+  dir.create("/media/jay/2TB_Drive/2024_11_27_SDM/Fish_mask")
+  dir.create("/media/jay/2TB_Drive/2024_11_27_SDM/MammalSmall_mask")
+  dir.create("/media/jay/2TB_Drive/2024_11_27_SDM/Bird_mask")
+  dir.create("/media/jay/2TB_Drive/2024_11_27_SDM/Amphibian_mask")
+  dir.create("/media/jay/2TB_Drive/2024_11_27_SDM/Reptile_mask")
+}
+
+# Nov 28 2024
+# rename fish SDMs
+fish_sdm_filepaths <- list.files(
+  path = "/media/jay/2TB_Drive/Zonation collaboration data (2024)/SPECIES/Fish_mask/",
+  pattern = "*.tif$"
+)
+
+readxl::excel_sheets("/media/jay/2TB_Drive/Zonation collaboration data (2024)/SPECIES/Species_Appendix_v2.xlsx")
+# [1] "species"    "fish"       "introduced" "missing"   
+
+fish_sdm_acronyms <- readxl::read_xlsx(
+  path = "/media/jay/2TB_Drive/Zonation collaboration data (2024)/SPECIES/Species_Appendix_v2.xlsx",
+  sheet = "fish"
+)
+
+for(i in 1:nrow(fish_sdm_acronyms)) {
+  fish_sdm_acronym <- fish_sdm_acronyms[i, "shortform (SDM folder)"][1] %>%
+    unlist() %>%
+    unname()
+  fish_sdm_species <- fish_sdm_acronyms[i, "Species name"][1] %>%
+    unlist() %>%
+    unname() %>%
+    gsub(" ", "\\.", .)
+  fish_sdm_common <- fish_sdm_acronyms[i, "Common name"][1] %>%
+    unlist() %>%
+    unname()
+  
+  matchthis <- paste0("^", fish_sdm_acronym, "_")
+  
+  fish_sdm_filepath  <- fish_sdm_filepaths[grepl(matchthis, fish_sdm_filepaths)] %>%
+    paste0("/media/jay/2TB_Drive/Zonation collaboration data (2024)/SPECIES/Fish_mask/", .)
+  fish_sdm_filepath_base <- fish_sdm_filepaths[grepl(matchthis, fish_sdm_filepaths)]
+  
+  
+  # fish_sdm_acronym %>% print()
+  # fish_sdm_species %>% print()
+  # fish_sdm_filepath %>%
+  #   print()
+  
+  fish_sdm_filepath_new <- fish_sdm_filepath_base %>% 
+    gsub(pattern = paste0("^", fish_sdm_acronym),
+         replacement = fish_sdm_species,
+         .) %>%
+    paste0("/media/jay/2TB_Drive/2024_11_27_SDM/Fish_mask/", .)
+  
+  fish_sdm_acronym %>% message("Acronym: ", .)
+  fish_sdm_species %>% message("Species: ", .)
+  fish_sdm_common %>% message("Common name: ", .)
+  fish_sdm_filepath %>% message("Original file: ", .)
+  fish_sdm_filepath_new %>% message("New file: ", .)
+  message("-------------------------------------------------------------------")
+  
+  fish_sdm <- terra::rast(fish_sdm_filepath) %>%
+    terra::writeRaster(fish_sdm_filepath_new, 
+                       overwrite=T)
+}
+
+```
+
 ```{r rescale_sdm}
-SDMs_og_path <- list.files("/media/jay/2TB_Drive/2024_10_21_SDMs_bowen_biodiversity/", 
+SDMs_og_path <- list.files("/media/jay/2TB_Drive/2024_11_27_SDM/", 
                            pattern = "*.tif$",
                            recursive = TRUE,
                            full.names = TRUE) 
@@ -25,41 +98,98 @@ for(i in 1:length(SDMs_og_path)) {
   if(SDM_rast_minmax[2] > 1) {
     SDM_rast <- SDM_rast / 1000
   }
-  filename <- paste0("/media/jay/2TB_Drive/2024_10_21_SDMs_bowen_biodiversity/Rescaled/", basename(SDMs_og_path[i]))
+  filename <- SDMs_og_path[i] %>%
+    gsub("2024_11_27_SDM", 
+         "2024_11_27_SDM_rescaled",
+         .)
+  
+  if(!dir.exists("/media/jay/2TB_Drive/2024_11_27_SDM_rescaled")) {
+    dir.create("/media/jay/2TB_Drive/2024_11_27_SDM_rescaled")
+    dir.create("/media/jay/2TB_Drive/2024_11_27_SDM_rescaled/Fish_mask")
+    dir.create("/media/jay/2TB_Drive/2024_11_27_SDM_rescaled/MammalSmall_mask")
+    dir.create("/media/jay/2TB_Drive/2024_11_27_SDM_rescaled/Bird_mask")
+    dir.create("/media/jay/2TB_Drive/2024_11_27_SDM_rescaled/Amphibian_mask")
+    dir.create("/media/jay/2TB_Drive/2024_11_27_SDM_rescaled/Reptile_mask")
+  }
+
+  message(filename, " saved.")
   terra::writeRaster(SDM_rast, filename)
 }
 ```
+
+
+Crop SDMs
+```{r}
+SDMs_rescaled_path <- list.files("/media/jay/2TB_Drive/2024_11_27_SDM_rescaled/", 
+                           pattern = "*.tif$",
+                           recursive = TRUE,
+                           full.names = TRUE) 
+bowen_boundary <- terra::vect("RawData/bowen_boundary/Bowen_boundary.shp")
+
+for(i in 1:length(SDMs_rescaled_path)) {
+  SDM_rast <- terra::rast(SDMs_rescaled_path[i])
+  filename <- SDMs_rescaled_path[i] %>%
+    gsub("2024_11_27_SDM_rescaled", 
+         "2024_11_28_SDM_Bowen_Island",
+         .)
+  
+  if(!dir.exists("/media/jay/2TB_Drive/2024_11_28_SDM_Bowen_Island/")) {
+    dir.create("/media/jay/2TB_Drive/2024_11_28_SDM_Bowen_Island/")
+    dir.create("/media/jay/2TB_Drive/2024_11_28_SDM_Bowen_Island/Fish_mask")
+    dir.create("/media/jay/2TB_Drive/2024_11_28_SDM_Bowen_Island/MammalSmall_mask")
+    dir.create("/media/jay/2TB_Drive/2024_11_28_SDM_Bowen_Island/Bird_mask")
+    dir.create("/media/jay/2TB_Drive/2024_11_28_SDM_Bowen_Island/Amphibian_mask")
+    dir.create("/media/jay/2TB_Drive/2024_11_28_SDM_Bowen_Island/Reptile_mask")
+  }
+
+  message(filename, " saved.")
+  SDM_rast_crop <- terra::crop(SDM_rast, bowen_boundary)
+  terra::writeRaster(SDM_rast_crop, filename)
+}
+
+```
+
 
 ```{r}
 # Bowen Island Boundary
 area <- sf::st_read("RawData/bowen_boundary/Bowen_boundary.shp")
 
 # Available SDMs
-SDM_dir <- "/media/jay/2TB_Drive/2024_10_21_SDMs_bowen_biodiversity/Rescaled/"
-SDM_filepaths <- list.files(SDM_dir) 
+SDM_dir <- "/media/jay/2TB_Drive/2024_11_28_SDM_Bowen_Island/"
+SDM_filepaths <- list.files(SDM_dir, recursive = T) 
 SDM_filepaths <- SDM_filepaths[grepl("_NAs_", SDM_filepaths)]
 
 # Create species list from available SDMs
 species_list <- SDM_filepaths %>%
+  basename() %>%
   stringr::str_extract("^\\S+\\.[a-zA-Z]+_") %>%
   stringr::str_remove("_") %>%
   stringr::str_replace("\\.", " ")
 
+type_list <- SDM_filepaths %>%
+  dirname() %>%
+  str_remove("_mask")
+
 bowen_SDM_iNat <- SDM_iNat_congruence(SDM_dir = SDM_dir, 
-                                      species_list = species_list[1:100],
+                                      species_list = species_list,
                                       area = area,
                                       mask_NA = T)
 
-bowen_SDM_iNat_amph <- SDM_iNat_congruence(SDM_dir = SDM_dir, 
-                                      species_list = c("Ambystoma gracile",
-                                                       "Ambystoma macrodactylum",
-                                                       "Ensatina eschscholtzii",
-                                                       "Pseudacris regilla",
-                                                       "Rana aurora",
-                                                       "Taricha granulosa"
-                                      ),
-                                      area = area,
-                                      mask_NA = T)
+bowen_SDM_iNat$taxon_group <- type_list
+
+write.csv(bowen_SDM_iNat, "ProcessedData/2024_11_29_SDM_CS_all_species")
 
 ```
+
+GENERATE FOCAL SPECIES LIST
+```{r}
+bowen_SDM_iNat <- read.csv("ProcessedData/2024_11_29_SDM_CS_all_species")
+threshold <- 0.5
+bowen_SDM_iNat <- bowen_SDM_iNat %>%
+  mutate(include = if_else((inat_n_obs > 0 & sdm_max_value > threshold), "Y", "N"))
+
+```
+
+
+
 
