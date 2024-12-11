@@ -86,6 +86,7 @@ SDM_df <- data.frame(filepath = SDM_filepaths,
                      species = species_list)
 
 SDM_obs_df <- merge(SDM_df, bowen_SDM_obs_focal_df, by = "species")
+write.csv(SDM_obs_df, "ProcessedData/2024_12_10_SDM_CS_all_species.csv")
 
 SDM_obs_df_bowen <- SDM_obs_df %>%
   filter(species %in% bowen_focal_list)
@@ -118,6 +119,40 @@ SDM_stack <- SDM_stack %>%
 SDM_stack %>% sum(na.rm = T) %>% plot()
 
 source("R/utils-sdm.R")
-total_richness <- sdm_to_species_richness(SDM_stack = SDM_stack)
-total_richness 
-writeRaster(total_richness, "ProcessedData/2024_12_10_species_richness.tif")
+total_richness_0.5 <- sdm_to_species_richness(SDM_stack = SDM_stack,
+                                          presence_threshold = 0.5)
+writeRaster(total_richness_0.5, 
+            "ProcessedData/2024_12_10_species_richness_0.5.tif",
+            overwrite = TRUE)
+
+total_richness_0.7 <- sdm_to_species_richness(SDM_stack = SDM_stack,
+                                          presence_threshold = 0.7)
+writeRaster(total_richness_0.7, 
+            "ProcessedData/2024_12_10_species_richness_0.7.tif",
+            overwrite = TRUE)
+
+source("R/plots.R")
+total_richness_0.5_plot <- bowen_map(raster_layer = total_richness_0.5,
+                                     title = "Total Species Richness",
+                                     subtitle = "Based on >0.5 probability of occurrence in Species Distribution Models. Includes Birds, Small Mammals, Amphibians, Reptiles, Fish.",
+                                     caption = "Created December 10 2024",
+                                     legend_label = "Number of Species")
+ggplot2::ggsave(
+  "Figures/2024_12_10_total_richness_0.5.png", 
+  total_richness_0.5_plot, 
+  device = ragg::agg_png, 
+  width = 9, height = 12, units = "in", res = 300
+)
+
+total_richness_0.7_plot <- bowen_map(raster_layer = total_richness_0.7,
+                                     title = "Total Species Richness",
+                                     subtitle = "Based on >0.7 probability of occurrence in Species Distribution Models. Includes Birds, Small Mammals, Amphibians, Reptiles, Fish.",
+                                     caption = "Created December 10 2024",
+                                     legend_label = "Number of Species")
+ggplot2::ggsave(
+  "Figures/2024_12_10_total_richness_0.7.png", 
+  total_richness_0.7_plot, 
+  device = ragg::agg_png, 
+  width = 9, height = 12, units = "in", res = 300
+)
+

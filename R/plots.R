@@ -5,7 +5,8 @@ bowen_shoreline <- "RawData/shoreline_dem_smoothed2/shoreline_dem_smoothed2.shp"
 bowen_map <- function(raster_layer,
                       title,
                       subtitle,
-                      caption) {
+                      caption,
+                      legend_label) {
   basemap_for_plot <- basemaps::basemap_terra(ext = raster_layer, map_service = "carto", map_type = "voyager")
   
   output_plot <- ggplot2::ggplot() +
@@ -16,15 +17,15 @@ bowen_map <- function(raster_layer,
     ggplot2::scale_fill_continuous(
       na.value = NA,
       type = "viridis",
-      limits = c(0,1),
-      breaks = c(0, 0.5, 1),
+      # limits = c(0,1),
+      # breaks = c(0, 0.5, 1),
       guide = ggplot2::guide_colourbar(nbin = 100, 
                                        draw.ulim = FALSE, 
                                        draw.llim = FALSE,
                                        title.position = "top"
                                        # title.hjust = 0.5
       ),
-      name = "Relative Biodiversity"
+      name = legend_label
     ) +
     ggplot2::geom_sf(data = bowen_trails,
                      aes(color = "Trails")
