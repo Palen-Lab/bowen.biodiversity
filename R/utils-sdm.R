@@ -8,10 +8,8 @@
 #' @export
 #'
 sdm_to_species_richness <- function(SDM_stack, 
-                                    presence_threshold = 0.7,
-                                    crs = "+proj=aea +lat_0=45 +lon_0=-126 +lat_1=50 +lat_2=58.5 +x_0=1000000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
-                                    ) {
-
+                                    presence_threshold = 0.7
+) {
   presence_stack <- sapp(SDM_stack, fun = function(x) {
     x[x > presence_threshold] <- 1
     x[x <= presence_threshold] <- 0
