@@ -165,9 +165,16 @@ weights <- matrix(c(0, 0, 1, 1, 1, 0, 0,
 for(i in 1:length(SDM_obs_df_bowen$filepath)) {
   SDM <- terra::rast(SDM_obs_df_bowen$filepath[i]) %>%
     terra::project(y = the_crs) %>%
+    # Fills the NA values missing in south part of Bowen Island
     terra::focal(w = weights, 
                  fun = "mean",
                  na.policy = "only") %>%
+    # Downsamples from 400 m to 100 m resolution
+    terra::disagg(fact = 4) %>%
+    # Smooths the raster
+    terra::focal(w = weights,
+                 fun = "mean",
+                 na.policy = "omit") %>%
     terra::mask(bowen_shoreline)
   SDM_stack[[i]] <- SDM
 }
