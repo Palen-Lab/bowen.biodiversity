@@ -1,0 +1,105 @@
+---
+title: "Bowen Island Biodiversity Relevant Layers"
+author: "Jay Matsushiba"
+date: "2024-12-12"
+output: "html_document"
+---
+
+```{r setup}
+library(terra)
+library(tidyverse)
+```
+
+```{r prepare}
+source("R/utils-sdm.R")
+ex_sdm <- terra::rast("ProcessedData/2024_12_11_SDM_100m_Bowen_Island/Amphibian_mask/Ambystoma.gracile_BowenIsland_100m.tif")
+
+#' Normalize on 0 to 1 scale
+normalize <- function(input_rast) {
+  mm <- minmax(input_rast)
+  min <- mm[1]
+  max <- mm[2]
+  normalized <- (input_rast - min) / (max - min)
+}
+#' Invert raster, so max values are min and vice versa. 
+invert <- function(input_rast) {
+  mm <- minmax(input_rast)
+  max <- mm[2]
+  inverted <- max - input_rast 
+}
+# Existing Disturbance ----
+# undisturbed_path <- "/media/jay/2TB_Drive/2024_Bowen_Biodiversity_Project/Zonation collaboration data (2024)/Environmental_Layers/Undisturbed/Jan29_Undisturb_v1.tif"
+disturbed_path <- "/media/jay/2TB_Drive/2024_Bowen_Biodiversity_Project/human_footprint_30m_v2.tif"
+disturbed <- terra::rast(disturbed_path)
+disturbed_resamp <- terra::resample(disturbed, ex_sdm)
+disturbed_normal <- disturbed_resamp %>% normalize()
+undisturbed <- disturbed_normal %>% invert()
+
+writeRaster(undisturbed, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/2024_12_12_human_footprint_100m_Bowen_Islands.tif", overwrite=TRUE)
+
+# OGMA (Old Growth Management Areas) ----
+ogma_path <- "/media/jay/2TB_Drive/2024_Bowen_Biodiversity_Project/BCGW_7113060B_1734046393868_8492/RMP_OGMA_LEGAL_CURRENT_SVW.gpkg"
+ogma <- terra::vect(ogma_path)
+ogma_rast <- terra::rasterize(ogma,
+                              ex_sdm) 
+writeRaster(ogma_rast, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/2024_12_12_OGMA.tif", overwrite = T)
+
+
+# Metro Vancouver Sensitive Ecosystem Inventory ----
+mv_sei <- sf::st_read("/media/jay/2TB_Drive/2024_Bowen_Biodiversity_Project/Sensitive_Ecosystem_Inventory_for_Metro_Vancouver__2020__-5580727563910851507.gpkg")
+bowen_boundary <- sf::st_read("RawData/bowen_boundary/Bowen_boundary.shp") %>%
+  sf::st_transform(sf::st_crs(mv_sei))
+# Column names:
+# SECl_1 - Sensitive Ecosystem Class
+# SEsubcl_1 - Sensitive Ecosystem Subclass
+# x in front of the code means recorded as lost
+# Table 2: https://metrovancouver.org/services/regional-planning/Documents/sensitive-ecosystem-inventory-technical-report.pdf 
+
+# Old Growth Extent ----
+oge_path <- "/media/jay/2TB_Drive/2024_Bowen_Biodiversity_Project/Zonation collaboration data (2024)/Environmental_Layers/Old_Growth_Extent/OGE_raster.tif"
+oge <- terra::rast(oge_path) 
+oge_bowen <- oge %>%
+  terra::crop(bowen_shoreline, snap = "out") # No OGE on Bowen Island
+
+bowen_sf_to_rast <- function(input_sf,
+                             varname = "Present") {
+  bowen_boundary <- sf::st_read("RawData/bowen_boundary/Bowen_boundary.shp") %>%
+    sf::st_transform(sf::st_crs(input_sf))
+  
+  output_rast <- input_sf %>%
+    sf::st_intersection(bowen_boundary) %>% # Clip polygons to Bowen Island boundary
+    terra::vect() %>% # Change to SpatVector for rasterization
+    terra::project(ex_sdm) %>% # Reproject to the SDM CRS 
+    terra::rasterize(ex_sdm, background = 0) # Rasterize to match SDM, set background values to 0
+  terra::varnames(output_rast) <- varname
+    
+  output_rast
+}
+# Old Forest ----
+# SECl_1 == "OF"
+bowen_sei_of <- mv_sei[mv_sei$SECl_1 == "OF",] %>% 
+  bowen_sf_to_rast(varname = "bowen_sei_oldforest")
+writeRaster(bowen_sei_of, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_oldforest.tif")
+
+# Wetland ----
+# SECl_1 == "WN"
+bowen_sei_wn <- mv_sei[mv_sei$SECl_1 == "WN",] %>%
+  bowen_sf_to_rast(varname = "bowen_sei_wetland")
+writeRaster(bowen_sei_wn, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_wetland.tif")
+
+
+# Riparian ----
+# SECl_1 == "RI"
+bowen_sei_ri <- mv_sei[mv_sei$SECl_1 == "RI",] %>%
+  bowen_sf_to_rast(varname = "bowen_sei_riparian")
+writeRaster(bowen_sei_ri, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_riparian.tif")
+
+
+# Freshwater ----
+# SECl_1 == "FW"
+bowen_sei_fw <- mv_sei[mv_sei$SECl_1 == "FW",] %>%
+  bowen_sf_to_rast(varname = "bowen_sei_freshwater")
+writeRaster(bowen_sei_fw, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_freshwater.tif")
+
+
+```
