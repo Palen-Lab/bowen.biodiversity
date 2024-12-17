@@ -49,6 +49,8 @@ writeRaster(ogma_rast, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/2
 mv_sei <- sf::st_read("/media/jay/2TB_Drive/2024_Bowen_Biodiversity_Project/Sensitive_Ecosystem_Inventory_for_Metro_Vancouver__2020__-5580727563910851507.gpkg")
 bowen_boundary <- sf::st_read("RawData/bowen_boundary/Bowen_boundary.shp") %>%
   sf::st_transform(sf::st_crs(mv_sei))
+
+
 # Column names:
 # SECl_1 - Sensitive Ecosystem Class
 # SEsubcl_1 - Sensitive Ecosystem Subclass
@@ -58,6 +60,8 @@ bowen_boundary <- sf::st_read("RawData/bowen_boundary/Bowen_boundary.shp") %>%
 # Old Growth Extent ----
 oge_path <- "/media/jay/2TB_Drive/2024_Bowen_Biodiversity_Project/Zonation collaboration data (2024)/Environmental_Layers/Old_Growth_Extent/OGE_raster.tif"
 oge <- terra::rast(oge_path) 
+bowen_shoreline <- terra::vect("RawData/shoreline_dem_smoothed2/shoreline_dem_smoothed2.shp") %>%
+  terra::project(oge)
 oge_bowen <- oge %>%
   terra::crop(bowen_shoreline, snap = "out") # No OGE on Bowen Island
 
@@ -70,7 +74,9 @@ bowen_sf_to_rast <- function(input_sf,
     sf::st_intersection(bowen_boundary) %>% # Clip polygons to Bowen Island boundary
     terra::vect() %>% # Change to SpatVector for rasterization
     terra::project(ex_sdm) %>% # Reproject to the SDM CRS 
-    terra::rasterize(ex_sdm, background = NA) # Rasterize to match SDM, set background values to NA
+    terra::rasterize(ex_sdm,
+                     touches = T,
+                     background = NA) # Rasterize to match SDM, set background values to NA
   terra::varnames(output_rast) <- varname
     
   output_rast
