@@ -20,12 +20,12 @@ sdm_to_species_richness <- function(SDM_stack,
 }
 
 # Defining CRS to make sure all rasters have the same
-the_crs <- "+proj=aea +lat_0=45 +lon_0=-126 +lat_1=50 +lat_2=58.5 +x_0=1000000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+#the_crs <- "+proj=aea +lat_0=45 +lon_0=-126 +lat_1=50 +lat_2=58.5 +x_0=1000000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
 
 # Bowen Shoreline polygon for masking the rasters 
-bowen_shoreline <- terra::vect("RawData/shoreline_dem_smoothed2/shoreline_dem_smoothed2.shp") %>%
-  terra::project(the_crs)
-bowen_boundary <- terra::vect("RawData/bowen_boundary/Bowen_boundary.shp")
+# bowen_shoreline <- terra::vect("RawData/shoreline_dem_smoothed2/shoreline_dem_smoothed2.shp") %>%
+#   terra::project(the_crs)
+# bowen_boundary <- terra::vect("RawData/bowen_boundary/Bowen_boundary.shp")
 
 #' Prepare rasters to match Bowen Island
 #'
@@ -35,7 +35,10 @@ bowen_boundary <- terra::vect("RawData/bowen_boundary/Bowen_boundary.shp")
 #' @export
 #'
 #' @examples
-raster_prep_bowen <- function(input_rast) {
+raster_prep_bowen <- function(input_rast,
+                              bowen_boundary,
+                              bowen_shoreline,
+                              crs) {
   # Weights for terra::focal() function that provides moving window average
   ## - Smoothing algorithm essentially
   ## - Use this to fill some empty cells on Bowen Island with weighted mean of the 
@@ -55,7 +58,7 @@ raster_prep_bowen <- function(input_rast) {
     # This means that the polygon extent is snapped to the closest raster
     # We need snap = "out" to make sure the full extent of the polygon is covered by the output raster
     terra::crop(bowen_boundary, snap = "out") %>%
-    terra::project(y = the_crs) %>%
+    terra::project(y = crs) %>%
     # Fills the NA values missing in south part of Bowen Island
     terra::focal(w = weights, 
                  fun = "mean",
@@ -65,6 +68,7 @@ raster_prep_bowen <- function(input_rast) {
     # Smooths the raster
     terra::focal(w = weights,
                  fun = "mean",
+                 na.rm = T,
                  na.policy = "omit") %>%
     terra::mask(bowen_shoreline)
 }

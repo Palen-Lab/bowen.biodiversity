@@ -70,7 +70,7 @@ bowen_sf_to_rast <- function(input_sf,
     sf::st_intersection(bowen_boundary) %>% # Clip polygons to Bowen Island boundary
     terra::vect() %>% # Change to SpatVector for rasterization
     terra::project(ex_sdm) %>% # Reproject to the SDM CRS 
-    terra::rasterize(ex_sdm, background = 0) # Rasterize to match SDM, set background values to 0
+    terra::rasterize(ex_sdm, background = NA) # Rasterize to match SDM, set background values to NA
   terra::varnames(output_rast) <- varname
     
   output_rast
