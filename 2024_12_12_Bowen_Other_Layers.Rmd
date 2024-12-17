@@ -79,27 +79,27 @@ bowen_sf_to_rast <- function(input_sf,
 # SECl_1 == "OF"
 bowen_sei_of <- mv_sei[mv_sei$SECl_1 == "OF",] %>% 
   bowen_sf_to_rast(varname = "bowen_sei_oldforest")
-writeRaster(bowen_sei_of, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_oldforest.tif")
+writeRaster(bowen_sei_of, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_oldforest.tif", overwrite = T)
 
 # Wetland ----
 # SECl_1 == "WN"
 bowen_sei_wn <- mv_sei[mv_sei$SECl_1 == "WN",] %>%
   bowen_sf_to_rast(varname = "bowen_sei_wetland")
-writeRaster(bowen_sei_wn, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_wetland.tif")
+writeRaster(bowen_sei_wn, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_wetland.tif", overwrite = T)
 
 
 # Riparian ----
 # SECl_1 == "RI"
 bowen_sei_ri <- mv_sei[mv_sei$SECl_1 == "RI",] %>%
   bowen_sf_to_rast(varname = "bowen_sei_riparian")
-writeRaster(bowen_sei_ri, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_riparian.tif")
+writeRaster(bowen_sei_ri, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_riparian.tif", overwrite = T)
 
 
 # Freshwater ----
 # SECl_1 == "FW"
 bowen_sei_fw <- mv_sei[mv_sei$SECl_1 == "FW",] %>%
   bowen_sf_to_rast(varname = "bowen_sei_freshwater")
-writeRaster(bowen_sei_fw, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_freshwater.tif")
+writeRaster(bowen_sei_fw, "ProcessedData/2024_12_12_Environment_100m_Bowen_Island/bowen_sei_freshwater.tif", overwrite = T)
 
 
 ```
